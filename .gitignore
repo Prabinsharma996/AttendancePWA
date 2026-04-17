@@ -1,0 +1,6 @@
+# Attendance Pro PWA
+
+node_modules/
+dist/
+.env
+*.local

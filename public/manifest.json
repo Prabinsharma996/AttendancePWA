@@ -1,0 +1,47 @@
+{
+  "name": "Attendance Pro",
+  "short_name": "Attendance",
+  "description": "Geofenced attendance system with biometric verification",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "icons": [
+    {
+      "src": "/icons/pwa-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/pwa-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/pwa-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Check In",
+      "short_name": "Check In",
+      "description": "Quick check-in with biometric verification",
+      "url": "/#/staff/check-in",
+      "icons": [{ "src": "/icons/pwa-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "My History",
+      "short_name": "History",
+      "description": "View my attendance history",
+      "url": "/#/staff/history",
+      "icons": [{ "src": "/icons/pwa-192x192.png", "sizes": "192x192" }]
+    }
+  ],
+  "categories": ["productivity", "business"],
+  "lang": "en",
+  "dir": "ltr"
+}
