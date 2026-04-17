@@ -243,3 +243,44 @@ CREATE POLICY "Staff manage own credentials" ON public.webauthn_credentials FOR 
 -- ─────────────────────────────────────────────
 ALTER PUBLICATION supabase_realtime ADD TABLE public.attendance_logs;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.users;
+
+-- ─────────────────────────────────────────────
+-- 11. AUTH TRIGGERS (Auto-sync with public.users)
+-- ─────────────────────────────────────────────
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS trigger AS $$
+DECLARE
+  new_org_id UUID;
+  user_role TEXT;
+BEGIN
+  user_role := COALESCE(new.raw_user_meta_data->>'role', 'staff');
+  
+  -- If owner, create a default organization first
+  IF user_role = 'owner' THEN
+    INSERT INTO public.organizations (name, owner_id)
+    VALUES (
+      COALESCE(new.raw_user_meta_data->>'full_name', 'My') || '''s Organization',
+      new.id
+    ) RETURNING id INTO new_org_id;
+  END IF;
+
+  -- Insert user profile
+  INSERT INTO public.users (id, email, full_name, role, phone, org_id)
+  VALUES (
+    new.id,
+    new.email,
+    COALESCE(new.raw_user_meta_data->>'full_name', 'Unknown User'),
+    user_role,
+    new.raw_user_meta_data->>'phone',
+    new_org_id
+  );
+  
+  RETURN new;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Trigger the function every time a user is created
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();

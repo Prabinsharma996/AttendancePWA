@@ -1,0 +1,273 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─────────────────────────────────────────────
+// Organizations
+// ─────────────────────────────────────────────
+model Organization {
+  id         String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  name       String
+  logoUrl    String?  @map("logo_url")
+  ownerId    String   @map("owner_id") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  users            User[]
+  locations        Location[]
+  attendanceLogs   AttendanceLog[]
+  attendanceRules  AttendanceRule?
+  leaveTypes       LeaveType[]
+  leaveRequests    LeaveRequest[]
+  holidays         Holiday[]
+  notifications    Notification[]
+
+  @@map("organizations")
+}
+
+// ─────────────────────────────────────────────
+// Users
+// ─────────────────────────────────────────────
+model User {
+  id              String    @id @db.Uuid
+  orgId           String?   @map("org_id") @db.Uuid
+  email           String    @unique
+  fullName        String    @map("full_name")
+  role            UserRole  @default(staff)
+  avatarUrl       String?   @map("avatar_url")
+  phone           String?
+  department      String?
+  designation     String?
+  employmentType  EmploymentType @default(full_time) @map("employment_type")
+  joinDate        DateTime?  @map("join_date") @db.Date
+  isActive        Boolean    @default(true) @map("is_active")
+  createdAt       DateTime   @default(now()) @map("created_at") @db.Timestamptz
+
+  organization        Organization?    @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  attendanceLogs      AttendanceLog[]
+  leaveBalances       LeaveBalance[]
+  leaveRequestsMade   LeaveRequest[]   @relation("UserLeaveRequests")
+  leaveRequestsReviewed LeaveRequest[] @relation("ReviewedLeaveRequests")
+  notifications       Notification[]
+  webAuthnCredentials WebAuthnCredential[]
+
+  @@map("users")
+}
+
+// ─────────────────────────────────────────────
+// Enums
+// ─────────────────────────────────────────────
+enum UserRole {
+  owner
+  manager
+  staff
+}
+
+enum EmploymentType {
+  full_time
+  part_time
+  contract
+}
+
+enum AttendanceType {
+  entry
+  exit
+}
+
+enum LeaveStatus {
+  pending
+  approved
+  rejected
+  cancelled
+}
+
+enum HolidayType {
+  national
+  company
+}
+
+// ─────────────────────────────────────────────
+// Locations (Office Geofences)
+// ─────────────────────────────────────────────
+model Location {
+  id            String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  orgId         String   @map("org_id") @db.Uuid
+  name          String
+  latitude      Float
+  longitude     Float
+  radiusMeters  Int      @default(20) @map("radius_meters")
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  organization    Organization    @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  attendanceLogs  AttendanceLog[]
+
+  @@map("locations")
+}
+
+// ─────────────────────────────────────────────
+// Attendance Rules
+// ─────────────────────────────────────────────
+model AttendanceRule {
+  id                       String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  orgId                    String   @unique @map("org_id") @db.Uuid
+  maxEntriesPerDay         Int      @default(2) @map("max_entries_per_day")
+  workStartTime            DateTime? @map("work_start_time") @db.Time
+  workEndTime              DateTime? @map("work_end_time") @db.Time
+  gracePeriodMinutes       Int      @default(15) @map("grace_period_minutes")
+  overtimeThresholdMinutes Int      @default(60) @map("overtime_threshold_minutes")
+  weekendDays              Int[]    @default([0, 6]) @map("weekend_days")
+  requiresBiometric        Boolean  @default(false) @map("requires_biometric")
+  createdAt                DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@map("attendance_rules")
+}
+
+// ─────────────────────────────────────────────
+// Attendance Logs
+// ─────────────────────────────────────────────
+model AttendanceLog {
+  id                String         @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  userId            String         @map("user_id") @db.Uuid
+  orgId             String         @map("org_id") @db.Uuid
+  locationId        String?        @map("location_id") @db.Uuid
+  type              AttendanceType
+  timestamp         DateTime       @default(now()) @db.Timestamptz
+  latitude          Float?
+  longitude         Float?
+  distanceFromZone  Float?         @map("distance_from_zone")
+  biometricVerified Boolean        @default(false) @map("biometric_verified")
+  deviceInfo        String?        @map("device_info")
+  isValid           Boolean        @default(true) @map("is_valid")
+  notes             String?
+  createdAt         DateTime       @default(now()) @map("created_at") @db.Timestamptz
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  location     Location?     @relation(fields: [locationId], references: [id], onDelete: SetNull)
+
+  @@index([orgId, timestamp(sort: Desc)], map: "idx_logs_org_date")
+  @@map("attendance_logs")
+}
+
+// ─────────────────────────────────────────────
+// Leave Types
+// ─────────────────────────────────────────────
+model LeaveType {
+  id               String  @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  orgId            String  @map("org_id") @db.Uuid
+  name             String
+  maxDaysPerYear   Int     @map("max_days_per_year")
+  isPaid           Boolean @default(true) @map("is_paid")
+  carryForward     Boolean @default(false) @map("carry_forward")
+  requiresApproval Boolean @default(true) @map("requires_approval")
+
+  organization   Organization   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  leaveBalances  LeaveBalance[]
+  leaveRequests  LeaveRequest[]
+
+  @@map("leave_types")
+}
+
+// ─────────────────────────────────────────────
+// Leave Balances
+// ─────────────────────────────────────────────
+model LeaveBalance {
+  id           String @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  userId       String @map("user_id") @db.Uuid
+  leaveTypeId  String @map("leave_type_id") @db.Uuid
+  year         Int
+  totalDays    Int    @map("total_days")
+  usedDays     Int    @default(0) @map("used_days")
+  pendingDays  Int    @default(0) @map("pending_days")
+
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  leaveType  LeaveType @relation(fields: [leaveTypeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, leaveTypeId, year])
+  @@map("leave_balances")
+}
+
+// ─────────────────────────────────────────────
+// Leave Requests
+// ─────────────────────────────────────────────
+model LeaveRequest {
+  id              String      @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  userId          String      @map("user_id") @db.Uuid
+  orgId           String      @map("org_id") @db.Uuid
+  leaveTypeId     String      @map("leave_type_id") @db.Uuid
+  startDate       DateTime    @map("start_date") @db.Date
+  endDate         DateTime    @map("end_date") @db.Date
+  totalDays       Int         @map("total_days")
+  reason          String
+  status          LeaveStatus @default(pending)
+  reviewedBy      String?     @map("reviewed_by") @db.Uuid
+  reviewedAt      DateTime?   @map("reviewed_at") @db.Timestamptz
+  rejectionReason String?     @map("rejection_reason")
+  createdAt       DateTime    @default(now()) @map("created_at") @db.Timestamptz
+
+  user         User         @relation("UserLeaveRequests", fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  leaveType    LeaveType    @relation(fields: [leaveTypeId], references: [id], onDelete: Cascade)
+  reviewer     User?        @relation("ReviewedLeaveRequests", fields: [reviewedBy], references: [id], onDelete: SetNull)
+
+  @@map("leave_requests")
+}
+
+// ─────────────────────────────────────────────
+// Holidays
+// ─────────────────────────────────────────────
+model Holiday {
+  id          String      @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  orgId       String      @map("org_id") @db.Uuid
+  name        String
+  date        DateTime    @db.Date
+  type        HolidayType
+  isRecurring Boolean     @default(false) @map("is_recurring")
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@map("holidays")
+}
+
+// ─────────────────────────────────────────────
+// Notifications
+// ─────────────────────────────────────────────
+model Notification {
+  id        String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  orgId     String   @map("org_id") @db.Uuid
+  title     String
+  body      String
+  type      String
+  isRead    Boolean  @default(false) @map("is_read")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+// ─────────────────────────────────────────────
+// WebAuthn Credentials (Biometrics)
+// ─────────────────────────────────────────────
+model WebAuthnCredential {
+  id           String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  userId       String   @map("user_id") @db.Uuid
+  credentialId String   @unique @map("credential_id")
+  publicKey    String   @map("public_key")
+  signCount    Int      @default(0) @map("sign_count")
+  deviceName   String?  @map("device_name")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("webauthn_credentials")
+}
