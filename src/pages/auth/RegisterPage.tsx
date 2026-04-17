@@ -18,7 +18,7 @@ export default function RegisterPage() {
     setError(null)
     setLoading(true)
     try {
-      const { error: authError } = await supabase.auth.signUp({
+      const { data, error: authError } = await supabase.auth.signUp({
         email: form.email,
         password: form.password,
         options: {
@@ -26,7 +26,12 @@ export default function RegisterPage() {
         },
       })
       if (authError) throw authError
-      navigate('/login', { state: { message: 'Account created! Please sign in.' } })
+      
+      if (data.session) {
+        navigate(form.role === 'owner' ? '/owner' : '/staff', { replace: true })
+      } else {
+        navigate('/login', { state: { message: 'Account created! Please check your email to confirm your account.' } })
+      }
     } catch (e: any) {
       setError(e.message)
     } finally {
