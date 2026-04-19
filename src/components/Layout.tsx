@@ -1,7 +1,8 @@
+import { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Users, CalendarDays, MapPin, Settings,
-  ClipboardList, Home, LogOut, Bell, FileText, Activity
+  ClipboardList, Home, LogOut, Bell, FileText, Activity, Menu, X
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import { useAuthStore } from '../store/authStore'
@@ -40,19 +41,45 @@ export const Layout = ({ children }: Props) => {
   const isOwner = user?.role === 'owner'
   const nav = isOwner ? OWNER_NAV : STAFF_NAV
 
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+
   const handleSignOut = async () => {
     await signOut()
     navigate('/login')
   }
 
   if (isOwner) {
-    // Sidebar layout for owner on desktop
+    // Responsive sidebar layout for owner
     return (
-      <div className="flex h-screen bg-slate-950 overflow-hidden">
+      <div className="flex h-screen bg-slate-950 overflow-hidden relative">
+        {/* Mobile Header */}
+        <div className="md:hidden absolute top-0 inset-x-0 h-16 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-4 z-40">
+           <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center">
+                 <ClipboardList className="w-4 h-4 text-white" />
+              </div>
+              <p className="font-bold text-white text-sm">Attendance Pro</p>
+           </div>
+           <button onClick={() => setIsMobileMenuOpen(true)} className="text-slate-400 hover:text-white p-2">
+             <Menu className="w-6 h-6" />
+           </button>
+        </div>
+
+        {/* Mobile Sidebar Overlay */}
+        {isMobileMenuOpen && (
+          <div 
+            className="md:hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-40"
+            onClick={() => setIsMobileMenuOpen(false)}
+          />
+        )}
+
         {/* Sidebar */}
-        <aside className="w-64 flex flex-col bg-slate-900 border-r border-slate-800">
+        <aside className={clsx(
+          "w-64 flex flex-col bg-slate-900 border-r border-slate-800 z-50 fixed inset-y-0 left-0 transition-transform duration-300 md:relative md:translate-x-0",
+          isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
+        )}>
           {/* Logo */}
-          <div className="px-6 py-5 border-b border-slate-800">
+          <div className="px-6 py-5 border-b border-slate-800 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center">
                 <ClipboardList className="w-5 h-5 text-white" />
@@ -62,15 +89,19 @@ export const Layout = ({ children }: Props) => {
                 <p className="text-xs text-slate-400">Owner Portal</p>
               </div>
             </div>
+            <button className="md:hidden text-slate-400 hover:text-white" onClick={() => setIsMobileMenuOpen(false)}>
+              <X className="w-5 h-5" />
+            </button>
           </div>
 
           {/* Nav items */}
-          <nav className="flex-1 py-4 space-y-1 px-3">
+          <nav className="flex-1 py-4 space-y-1 px-3 overflow-y-auto">
             {nav.map(item => (
               <NavLink
                 key={item.to}
                 to={item.to}
                 end={item.to === '/owner'}
+                onClick={() => setIsMobileMenuOpen(false)}
                 className={({ isActive }) => clsx(
                   'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all',
                   isActive
@@ -85,9 +116,9 @@ export const Layout = ({ children }: Props) => {
           </nav>
 
           {/* Profile + Logout */}
-          <div className="p-4 border-t border-slate-800">
+          <div className="p-4 border-t border-slate-800 shrink-0">
             <div className="flex items-center gap-3 mb-3">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-sky-400 to-blue-500 flex items-center justify-center text-sm font-bold text-white">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-sky-400 to-blue-500 flex items-center justify-center text-sm font-bold text-white shrink-0">
                 {user?.full_name?.charAt(0) ?? 'O'}
               </div>
               <div className="flex-1 min-w-0">
@@ -105,7 +136,7 @@ export const Layout = ({ children }: Props) => {
         </aside>
 
         {/* Main content */}
-        <main className="flex-1 overflow-y-auto">
+        <main className="flex-1 overflow-y-auto pt-16 md:pt-0 pb-6">
           {children}
         </main>
       </div>
