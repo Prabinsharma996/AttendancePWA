@@ -5,7 +5,7 @@ import supabase from '../../api/supabase'
 
 export default function RegisterPage() {
   const navigate = useNavigate()
-  const [form, setForm] = useState({ full_name: '', email: '', phone: '', password: '', role: 'staff' })
+  const [form, setForm] = useState({ full_name: '', email: '', phone: '', password: '', role: 'owner' })
   const [showPw, setShowPw] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -96,15 +96,7 @@ export default function RegisterPage() {
               </div>
             </div>
 
-            {/* Role */}
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium text-slate-300">Role</label>
-              <select value={form.role} onChange={handle('role')}
-                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500 transition-all">
-                <option value="staff">Staff</option>
-                <option value="owner">Owner / Manager</option>
-              </select>
-            </div>
+            <input type="hidden" name="role" value="owner" />
 
             <button type="submit" disabled={loading}
               className="w-full bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-white font-semibold rounded-xl py-3 flex items-center justify-center gap-2 transition-all shadow-lg shadow-sky-500/20 active:scale-[0.98] disabled:opacity-60 mt-2">

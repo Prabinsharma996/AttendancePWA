@@ -1,9 +1,10 @@
 import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Users, Search, Download, Upload, Plus, MoreVertical, Edit2, UserX } from 'lucide-react'
+import { Users, Search, Download, Upload, Plus, MoreVertical, Edit2, UserX, X, AlertCircle, Loader2 } from 'lucide-react'
 import Papa from 'papaparse'
 import { useAuthStore } from '../../store/authStore'
 import { getAllStaff } from '../../api/attendance'
+import { adminAuthClient } from '../../api/adminAuthClient'
 import { Button } from '../../components/Button'
 
 export default function StaffListPage() {
@@ -20,6 +21,11 @@ export default function StaffListPage() {
   const [filterDept, setFilterDept] = useState('All')
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  const [isInviteModalOpen, setIsInviteModalOpen] = useState(false)
+  const [inviteForm, setInviteForm] = useState({ full_name: '', email: '', password: '', department: '' })
+  const [inviting, setInviting] = useState(false)
+  const [inviteError, setInviteError] = useState<string | null>(null)
+
   const handleCSVUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -27,10 +33,42 @@ export default function StaffListPage() {
       header: true,
       complete: (results) => {
         console.log('Parsed CSV', results.data)
-        // Here you would send results.data to a Supabase Edge Function to invite users en masse
         alert(`Parsed ${results.data.length} rows. Backend integration required to securely send invites.`)
       }
     })
+  }
+
+  const handleInviteStaff = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!user?.org_id) return
+    setInviteError(null)
+    setInviting(true)
+
+    try {
+      const { data, error } = await adminAuthClient.auth.signUp({
+        email: inviteForm.email,
+        password: inviteForm.password,
+        options: {
+          data: {
+            full_name: inviteForm.full_name,
+            role: 'staff',
+            department: inviteForm.department,
+            org_id: user.org_id
+          }
+        }
+      })
+
+      if (error) throw error
+
+      setInviteForm({ full_name: '', email: '', password: '', department: '' })
+      setIsInviteModalOpen(false)
+      qc.invalidateQueries({ queryKey: ['staff', user.org_id] })
+      alert("Staff added successfully!")
+    } catch (err: any) {
+      setInviteError(err.message)
+    } finally {
+      setInviting(false)
+    }
   }
 
   const filteredStaff = staff.filter(s => {
@@ -54,8 +92,8 @@ export default function StaffListPage() {
           <Button variant="secondary" icon={<Upload className="w-4 h-4" />} onClick={() => fileInputRef.current?.click()}>
             Import CSV
           </Button>
-          <Button icon={<Plus className="w-4 h-4" />}>
-            Invite Staff
+          <Button icon={<Plus className="w-4 h-4" />} onClick={() => setIsInviteModalOpen(true)}>
+            Add Staff
           </Button>
         </div>
       </div>
@@ -132,6 +170,45 @@ export default function StaffListPage() {
           </table>
         </div>
       </div>
+
+      {isInviteModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+          <div className="w-full max-w-md bg-slate-900 border border-slate-700 rounded-2xl p-6 shadow-2xl relative">
+            <button onClick={() => setIsInviteModalOpen(false)} className="absolute top-4 right-4 text-slate-400 hover:text-white">
+              <X className="w-5 h-5" />
+            </button>
+            <h2 className="text-xl font-bold text-white mb-4">Add New Staff</h2>
+            <form onSubmit={handleInviteStaff} className="flex flex-col gap-4">
+              {inviteError && (
+                <div className="flex items-start gap-3 bg-red-500/10 border border-red-500/20 rounded-xl p-3 text-red-400 text-sm">
+                  <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />{inviteError}
+                </div>
+              )}
+              
+              <div>
+                <label className="text-xs font-medium text-slate-400 mb-1 block">Full Name</label>
+                <input required type="text" value={inviteForm.full_name} onChange={e => setInviteForm({...inviteForm, full_name: e.target.value})} className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white" />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-400 mb-1 block">Email</label>
+                <input required type="email" value={inviteForm.email} onChange={e => setInviteForm({...inviteForm, email: e.target.value})} className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white" />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-400 mb-1 block">Initial Password</label>
+                <input required type="text" minLength={8} value={inviteForm.password} onChange={e => setInviteForm({...inviteForm, password: e.target.value})} className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white" />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-400 mb-1 block">Department (Optional)</label>
+                <input type="text" value={inviteForm.department} onChange={e => setInviteForm({...inviteForm, department: e.target.value})} className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white" />
+              </div>
+
+              <div className="pt-2">
+                <Button type="submit" className="w-full" loading={inviting}>Create Staff Account</Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

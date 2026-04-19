@@ -262,6 +262,9 @@ BEGIN
       COALESCE(new.raw_user_meta_data->>'full_name', 'My') || '''s Organization',
       new.id
     ) RETURNING id INTO new_org_id;
+  ELSE
+    -- If staff, expect org_id to be passed from the inviter
+    new_org_id := (new.raw_user_meta_data->>'org_id')::uuid;
   END IF;
 
   -- Insert user profile

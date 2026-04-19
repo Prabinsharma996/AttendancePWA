@@ -125,3 +125,22 @@ export const getAllStaff = async (orgId: string): Promise<User[]> => {
   if (error) throw error
   return data ?? []
 }
+
+// ─── Locations APIs ────────────────────────────────────────────────────────
+export const getLocations = async (orgId: string) => {
+  const { data, error } = await supabase.from('locations').select('*').eq('org_id', orgId);
+  if (error) throw error;
+  return data ?? [];
+}
+
+export const saveLocation = async (locationId: string | undefined, locationData: { org_id: string, name: string, latitude: number, longitude: number, radius_meters: number }) => {
+  if (locationId) {
+    const { data, error } = await supabase.from('locations').update(locationData).eq('id', locationId).select().single()
+    if (error) throw error
+    return data
+  } else {
+    const { data, error } = await supabase.from('locations').insert(locationData).select().single()
+    if (error) throw error
+    return data
+  }
+}

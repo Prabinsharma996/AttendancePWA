@@ -1,18 +1,28 @@
 import { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Settings, Save, Clock, Fingerprint, CalendarCheck } from 'lucide-react'
+import { Settings, Save, Clock, Fingerprint, CalendarCheck, MapPin, Loader2 } from 'lucide-react'
 import { useAuthStore } from '../../store/authStore'
-import { getAttendanceRules, saveAttendanceRules } from '../../api/attendance'
+import { getAttendanceRules, saveAttendanceRules, getLocations, saveLocation } from '../../api/attendance'
+import { useGeolocation } from '../../hooks/useGeolocation'
 import { Button } from '../../components/Button'
 
 export default function RulesPage() {
   const { user } = useAuthStore()
   
-  const { data: dbRules, refetch } = useQuery({ 
+  const { data: dbRules, refetch: refetchRules } = useQuery({ 
     queryKey: ['rules', user?.org_id], 
     queryFn: () => getAttendanceRules(user!.org_id!),
     enabled: !!user?.org_id
   })
+
+  // Location logic
+  const { data: locations, refetch: refetchLocations } = useQuery({
+    queryKey: ['locations', user?.org_id],
+    queryFn: () => getLocations(user!.org_id!),
+    enabled: !!user?.org_id
+  })
+  
+  const geoLocation = useGeolocation(true)
 
   const [saving, setSaving] = useState(false)
   const [formData, setFormData] = useState({
@@ -23,6 +33,14 @@ export default function RulesPage() {
     overtime_threshold_minutes: 60,
     requires_biometric: true,
     weekend_days: [0, 6] // Sun, Sat
+  })
+
+  const [locData, setLocData] = useState({
+    id: undefined as string | undefined,
+    name: 'Main Office',
+    latitude: 0,
+    longitude: 0,
+    radius_meters: 50
   })
 
   useEffect(() => {
@@ -39,6 +57,31 @@ export default function RulesPage() {
     }
   }, [dbRules])
 
+  useEffect(() => {
+    if (locations && locations.length > 0) {
+      const mainLoc = locations[0]
+      setLocData({
+        id: mainLoc.id,
+        name: mainLoc.name,
+        latitude: mainLoc.latitude,
+        longitude: mainLoc.longitude,
+        radius_meters: mainLoc.radius_meters
+      })
+    }
+  }, [locations])
+
+  const handleSetCurrentLocation = () => {
+    if (geoLocation.lat && geoLocation.lng) {
+      setLocData(prev => ({
+        ...prev,
+        latitude: Number(geoLocation.lat?.toFixed(6)),
+        longitude: Number(geoLocation.lng?.toFixed(6))
+      }))
+    } else {
+      alert("Still acquiring GPS signal. Please try again in a moment.")
+    }
+  }
+
   const handleSave = async () => {
     if (!user?.org_id) return
     setSaving(true)
@@ -47,7 +90,18 @@ export default function RulesPage() {
         ...formData,
         org_id: user.org_id
       })
-      refetch()
+      await saveLocation(locData.id, {
+        org_id: user.org_id,
+        name: locData.name,
+        latitude: locData.latitude,
+        longitude: locData.longitude,
+        radius_meters: locData.radius_meters
+      })
+      refetchRules()
+      refetchLocations()
+      alert("Settings saved successfully!")
+    } catch(err: any) {
+      alert("Error saving: " + err.message)
     } finally {
       setSaving(false)
     }
@@ -56,23 +110,62 @@ export default function RulesPage() {
   const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
   return (
-    <div className="p-6 max-w-4xl mx-auto flex flex-col gap-6">
+    <div className="p-6 max-w-5xl mx-auto flex flex-col gap-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white mb-1">Attendance Rules & Policies</h1>
-          <p className="text-slate-400 text-sm">Configure how attendance is tracked for your organization.</p>
+          <h1 className="text-2xl font-bold text-white mb-1">Attendance Rules & Location</h1>
+          <p className="text-slate-400 text-sm">Configure attendance limits, timings, and office geolocation.</p>
         </div>
         <Button onClick={handleSave} loading={saving} icon={<Save className="w-4 h-4" />}>
-          Save Changes
+          Save All Changes
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        
+        {/* Office Location Config */}
+        <div className="glass rounded-xl p-6 border border-slate-700/50 flex flex-col gap-5 lg:col-span-1">
+          <div className="flex items-center gap-2 mb-2 border-b border-slate-800 pb-3">
+            <MapPin className="w-5 h-5 text-rose-400" />
+            <h2 className="text-white font-semibold flex-1">Office Geolocation</h2>
+          </div>
+
+          <div className="flex flex-col gap-3">
+             <button onClick={handleSetCurrentLocation} className="w-full bg-slate-800 hover:bg-slate-700 text-white font-medium py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors text-sm border border-slate-700">
+               {geoLocation.loading ? <Loader2 className="w-4 h-4 animate-spin text-sky-400" /> : <MapPin className="w-4 h-4 text-sky-400" />}
+               Use My Current Location
+             </button>
+             {geoLocation.error && <p className="text-[10px] text-red-400">{geoLocation.error}</p>}
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 mt-2">
+            <div>
+              <label className="text-xs text-slate-400 mb-1 block">Latitude</label>
+              <input type="number" step="any" value={locData.latitude} onChange={e => setLocData({...locData, latitude: parseFloat(e.target.value)})}
+                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:ring-2 focus:ring-sky-500" />
+            </div>
+            <div>
+              <label className="text-xs text-slate-400 mb-1 block">Longitude</label>
+              <input type="number" step="any" value={locData.longitude} onChange={e => setLocData({...locData, longitude: parseFloat(e.target.value)})}
+                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:ring-2 focus:ring-sky-500" />
+            </div>
+          </div>
+
+          <div>
+             <label className="text-xs text-slate-400 mb-1 block">Allowed Radius (Meters)</label>
+             <div className="flex items-center gap-3">
+               <input type="range" min="10" max="500" step="5" value={locData.radius_meters} onChange={e => setLocData({...locData, radius_meters: parseInt(e.target.value)})}
+                 className="flex-1 accent-sky-500 h-1.5 bg-slate-700 rounded-full appearance-none cursor-pointer" />
+               <span className="text-sm font-bold text-white w-12 text-right">{locData.radius_meters}m</span>
+             </div>
+          </div>
+        </div>
+
         {/* Timing Configuration */}
-        <div className="glass rounded-xl p-6 border border-slate-700/50 flex flex-col gap-5">
+        <div className="glass rounded-xl p-6 border border-slate-700/50 flex flex-col gap-5 lg:col-span-1">
           <div className="flex items-center gap-2 mb-2 border-b border-slate-800 pb-3">
             <Clock className="w-5 h-5 text-sky-400" />
-            <h2 className="text-white font-semibold flex-1">Work Hours & Timings</h2>
+            <h2 className="text-white font-semibold flex-1">Work Hours</h2>
           </div>
           
           <div className="grid grid-cols-2 gap-4">
@@ -103,7 +196,7 @@ export default function RulesPage() {
         </div>
 
         {/* Security & Days */}
-        <div className="glass rounded-xl p-6 border border-slate-700/50 flex flex-col gap-5">
+        <div className="glass rounded-xl p-6 border border-slate-700/50 flex flex-col gap-5 lg:col-span-1">
           <div className="flex items-center gap-2 mb-2 border-b border-slate-800 pb-3">
             <Fingerprint className="w-5 h-5 text-emerald-400" />
             <h2 className="text-white font-semibold flex-1">Security & Limits</h2>
@@ -112,7 +205,7 @@ export default function RulesPage() {
           <div className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg border border-slate-700/50">
             <div>
               <p className="text-sm font-medium text-white">Require Biometrics</p>
-              <p className="text-xs text-slate-400">Enforce fingerprint/FaceID on check-in</p>
+              <p className="text-xs text-slate-400">Enforce fingerprint on check-in</p>
             </div>
             <label className="relative inline-flex items-center cursor-pointer">
               <input type="checkbox" className="sr-only peer" checked={formData.requires_biometric} onChange={e => setFormData({...formData, requires_biometric: e.target.checked})} />
@@ -154,3 +247,4 @@ export default function RulesPage() {
     </div>
   )
 }
+
