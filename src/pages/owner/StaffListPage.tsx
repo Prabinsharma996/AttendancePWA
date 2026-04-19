@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Users, Search, Download, Upload, Plus, Edit2, UserX, X, AlertCircle } from 'lucide-react'
+import { Users, Search, Download, Upload, Plus, Edit2, UserX, X, AlertCircle, Loader2 } from 'lucide-react'
 import Papa from 'papaparse'
 import { useAuthStore } from '../../store/authStore'
 import { getAllStaff, updateStaff, deleteStaff } from '../../api/attendance'
@@ -134,6 +134,19 @@ export default function StaffListPage() {
         </div>
       </div>
 
+      {!user?.org_id && (
+        <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 flex items-start gap-4">
+          <AlertCircle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+          <div>
+             <p className="text-amber-500 font-bold text-sm">Owner Configuration Missing</p>
+             <p className="text-amber-500/80 text-xs leading-relaxed mt-1">
+               Your profile doesn't have an Organization ID linked yet. This usually happens if the account was created during a database sync process. 
+               Please log out and log back in, or contact support if the issue persists.
+             </p>
+          </div>
+        </div>
+      )}
+
       <div className="glass rounded-xl p-4 flex flex-col md:flex-row gap-4 border border-slate-700/50">
         <div className="flex-1 relative">
           <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -150,6 +163,9 @@ export default function StaffListPage() {
         >
           {departments.map(d => <option key={d} value={d}>{d}</option>)}
         </select>
+        <Button variant="secondary" onClick={() => qc.invalidateQueries({ queryKey: ['staff'] })} size="sm">
+          Refresh List
+        </Button>
       </div>
 
       <div className="glass rounded-xl overflow-hidden border border-slate-700/50">
@@ -165,9 +181,21 @@ export default function StaffListPage() {
             </thead>
             <tbody className="divide-y divide-slate-800/50">
               {isLoading ? (
-                <tr><td colSpan={4} className="p-8 text-center text-slate-500">Loading...</td></tr>
+                <tr><td colSpan={4} className="p-12 text-center text-slate-500">
+                  <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 text-sky-500" />
+                  Loading Staff Directory...
+                </td></tr>
               ) : filteredStaff.length === 0 ? (
-                <tr><td colSpan={4} className="p-8 text-center text-slate-500">No staff found.</td></tr>
+                <tr><td colSpan={4} className="p-12 text-center">
+                  <div className="flex flex-col items-center gap-2 max-w-sm mx-auto">
+                    <Users className="w-8 h-8 text-slate-700 mb-2" />
+                    <p className="text-slate-400 font-medium text-sm">No staff members found</p>
+                    <p className="text-slate-500 text-xs leading-relaxed">
+                      If you have recently added staff and they don't appear, ensure you have set up an 
+                      Organization name in your Settings and that the staff members have confirmed their accounts.
+                    </p>
+                  </div>
+                </td></tr>
               ) : (
                 filteredStaff.map(s => (
                   <tr key={s.id} className="hover:bg-slate-800/20 transition-colors">

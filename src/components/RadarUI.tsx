@@ -78,20 +78,35 @@ export const RadarUI = ({
             <AlertTriangle className="w-4 h-4" /> GPS accuracy too low (~{Math.round(accuracy ?? 0)}m).
           </div>
         ) : nearestLocation ? (
-          <>
-            <p className="text-slate-300 font-medium">{nearestLocation.name}</p>
+          <div className="flex flex-col gap-2 w-full">
+            <div className="flex items-center justify-center gap-2 text-slate-400">
+               <MapPin className="w-3 h-3" />
+               <span className="text-sm font-medium">{nearestLocation.name}</span>
+            </div>
             {isWithinZone ? (
-             <div className="text-emerald-400 font-bold flex items-center gap-2">
-               <CheckCircle2 className="w-5 h-5 pulse" /> You are in the zone
+             <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-4 text-emerald-400 flex flex-col items-center gap-1 animate-in fade-in zoom-in duration-500">
+               <div className="flex items-center gap-2">
+                 <CheckCircle2 className="w-5 h-5 flex-shrink-0" />
+                 <span className="text-lg font-bold">Within Office Zone</span>
+               </div>
+               <p className="text-xs opacity-80 font-medium tracking-tight">You are authorized to record attendance</p>
              </div>
             ) : (
-             <div className="text-red-400 font-semibold flex items-center gap-2">
-               You are {Math.round(distanceToNearest ?? 0)}m away. Move closer.
+             <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-4 text-red-400 flex flex-col items-center gap-1">
+               <div className="flex items-center gap-2">
+                 <AlertTriangle className="w-5 h-5 flex-shrink-0" />
+                 <span className="text-lg font-bold">Outside Office Area</span>
+               </div>
+               <p className="text-xs opacity-80 font-medium">Move {Math.round(distanceToNearest ?? 0)}m closer to the office</p>
              </div>
             )}
-          </>
+          </div>
         ) : (
-          <div className="text-slate-400 text-sm">No active office locations found.</div>
+          <div className="bg-slate-800/50 rounded-2xl p-6 border border-slate-700/50 flex flex-col items-center gap-2">
+            <MapPin className="w-8 h-8 text-slate-600 mb-2" />
+            <p className="text-slate-400 font-medium">No nearby office found</p>
+            <p className="text-xs text-slate-500 text-balance px-4 leading-relaxed">Please ensure you have office locations set up in the Admin portal.</p>
+          </div>
         )}
 
         <Button 
