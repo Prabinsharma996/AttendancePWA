@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
-import { User, Fingerprint, BellRing, ExternalLink, ShieldCheck, Download, Camera, CheckCircle2, X } from 'lucide-react'
+import { User, Fingerprint, BellRing, ExternalLink, ShieldCheck, Download, Camera, CheckCircle2, X, LogOut } from 'lucide-react'
 import { useAuthStore } from '../../store/authStore'
 import { useBiometric } from '../../hooks/useBiometric'
+import { Button } from '../../components/Button'
 
 export default function StaffProfile() {
-  const { user } = useAuthStore()
+  const { user, signOut } = useAuthStore()
   const { isSupported, register } = useBiometric()
   const [registering, setRegistering] = useState(false)
   const [bioSuccess, setBioSuccess] = useState<boolean | null>(null)
@@ -123,7 +124,7 @@ export default function StaffProfile() {
                 <button onClick={stopCamera} className="w-12 h-12 bg-red-500 rounded-full flex items-center justify-center text-white shadow-lg">
                   <X className="w-6 h-6" />
                 </button>
-                <button onClick={captureFace} className="w-12 h-12 bg-white rounded-full flex items-center justify-center text-slate-900 border-4 border-slate-300/50 shadow-lg">
+                <button onClick={captureFace} className="w-12 h-12 bg-white rounded-full flex items-center justify-center text-slate-900 border-4 border-slate-300/50 shadow-lg" title="Capture Photo">
                   <Camera className="w-5 h-5" />
                 </button>
               </div>
@@ -186,6 +187,7 @@ export default function StaffProfile() {
              <button 
                onClick={() => setPushEnabled(!pushEnabled)}
                className={`w-12 h-6 rounded-full transition-colors relative flex items-center ${pushEnabled ? 'bg-sky-500' : 'bg-slate-700'}`}
+               title="Toggle Notifications"
              >
                <div className={`w-5 h-5 rounded-full bg-white absolute top-[2px] transition-transform ${pushEnabled ? 'translate-x-[26px]' : 'translate-x-[2px]'}`}></div>
              </button>
@@ -203,6 +205,16 @@ export default function StaffProfile() {
                <Download className="w-4 h-4 text-slate-400" />
             </button>
           )}
+        </div>
+
+        <div className="px-4 pb-6">
+           <button 
+             onClick={() => signOut()}
+             className="w-full flex items-center justify-center gap-3 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-400 font-bold hover:bg-red-500/20 transition-all active:scale-[0.98]"
+           >
+             <LogOut className="w-5 h-5" />
+             Sign Out of Account
+           </button>
         </div>
 
         <div className="text-center py-6">

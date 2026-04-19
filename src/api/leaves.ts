@@ -7,6 +7,17 @@ export const getLeaveTypes = async (orgId: string): Promise<LeaveType[]> => {
   return data ?? []
 }
 
+export const createLeaveType = async (leaveType: Omit<LeaveType, 'id'>) => {
+  const { data, error } = await supabase.from('leave_types').insert(leaveType).select().single()
+  if (error) throw error
+  return data
+}
+
+export const deleteLeaveType = async (id: string) => {
+  const { error } = await supabase.from('leave_types').delete().eq('id', id)
+  if (error) throw error
+}
+
 export const getMyLeaveBalances = async (userId: string, year: number): Promise<LeaveBalance[]> => {
   const { data, error } = await supabase.from('leave_balances').select('*, leave_type:leave_types(*)').eq('user_id', userId).eq('year', year)
   if (error) throw error

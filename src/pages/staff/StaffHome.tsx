@@ -4,6 +4,8 @@ import { MapPin, CalendarDays, ClipboardList, Clock, ArrowRight } from 'lucide-r
 import { format } from 'date-fns'
 import { useAuthStore } from '../../store/authStore'
 import { useAttendance } from '../../hooks/useAttendance'
+import { useBiometric } from '../../hooks/useBiometric'
+import { ShieldAlert, Fingerprint, ChevronRight } from 'lucide-react'
 
 function LiveClock() {
   const [time, setTime] = useState(new Date())
@@ -25,8 +27,18 @@ export default function StaffHome() {
   const navigate = useNavigate()
   const { user } = useAuthStore()
   const { lastLog, history } = useAttendance()
+  const { isSupported, hasCredential } = useBiometric()
+  const [showBioPrompt, setShowBioPrompt] = useState(false)
   
   const isCheckedIn = lastLog?.type === 'entry'
+
+  useEffect(() => {
+    if (user && isSupported()) {
+      hasCredential(user.id).then(exists => {
+        setShowBioPrompt(!exists)
+      })
+    }
+  }, [user, isSupported, hasCredential])
 
   // Count checkins today based on history length (history is fetched for 60 days, so let's filter for today manually)
   const todayStr = format(new Date(), 'yyyy-MM-dd')
@@ -47,6 +59,23 @@ export default function StaffHome() {
         <p className="text-slate-400 text-sm">Welcome back to work</p>
         
         <LiveClock />
+
+        {/* Biometric Setup Prompt */}
+        {showBioPrompt && (
+          <button 
+            onClick={() => navigate('/staff/profile')}
+            className="w-full bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 mb-4 text-left flex items-center gap-4 group transition-all hover:bg-amber-500/20"
+          >
+             <div className="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-500 shrink-0">
+               <Fingerprint className="w-5 h-5" />
+             </div>
+             <div className="flex-1">
+               <p className="text-sm font-bold text-amber-500">Enable Biometrics</p>
+               <p className="text-xs text-slate-400 mt-0.5">Link your device for secure check-in</p>
+             </div>
+             <ChevronRight className="w-4 h-4 text-slate-500 group-hover:translate-x-1 transition-transform" />
+          </button>
+        )}
 
         {/* Status Card */}
         <div className="glass rounded-2xl p-4 border border-slate-700/50 mt-4 flex items-center justify-between">

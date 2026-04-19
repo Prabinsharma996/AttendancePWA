@@ -101,5 +101,16 @@ export const useBiometric = () => {
     return !!assertion
   }, [isSupported])
 
-  return { isSupported, register, verify }
+  /** Check if the current user has any biometric credentials registered */
+  const hasCredential = useCallback(async (userId: string): Promise<boolean> => {
+    const { data, error } = await supabase
+      .from('webauthn_credentials')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+    
+    if (error) return false
+    return (data?.length ?? 0) > 0
+  }, [])
+
+  return { isSupported, register, verify, hasCredential }
 }

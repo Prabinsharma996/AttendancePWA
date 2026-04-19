@@ -2,7 +2,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '../store/authStore'
 import { 
   getLeaveTypes, getMyLeaveBalances, getMyLeaveRequests, 
-  getAllLeaveRequestsByOrg, submitLeaveRequest, reviewLeaveRequest 
+  getAllLeaveRequestsByOrg, submitLeaveRequest, reviewLeaveRequest,
+  createLeaveType, deleteLeaveType
 } from '../api/leaves'
 
 export const useLeave = () => {
@@ -58,5 +59,14 @@ export const useLeave = () => {
     isLoading: typesQuery.isLoading || myRequestsQuery.isLoading,
     submitLeave: submitMutation.mutateAsync,
     reviewLeave: reviewMutation.mutateAsync,
+    createType: useMutation({
+      mutationFn: (type: { name: string, max_days_per_year: number, is_paid: boolean }) => 
+        createLeaveType({ ...type, org_id: user!.org_id!, carry_forward: false, requires_approval: true }),
+      onSuccess: () => qc.invalidateQueries({ queryKey: ['leave_types'] })
+    }).mutateAsync,
+    deleteType: useMutation({
+      mutationFn: deleteLeaveType,
+      onSuccess: () => qc.invalidateQueries({ queryKey: ['leave_types'] })
+    }).mutateAsync,
   }
 }

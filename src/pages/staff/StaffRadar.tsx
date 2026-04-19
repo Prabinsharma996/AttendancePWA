@@ -39,9 +39,15 @@ export default function StaffRadar() {
   }, [locations, lat, lng, getDistanceTo])
 
   const handleAction = async () => {
-    // Biometric skip if not supported for now, though rules could strictly enforce it
-    const bioSuccess = isSupported() ? await verify(user!.id) : true
-    if (!bioSuccess) return
+    try {
+      if (isSupported()) {
+        const bioSuccess = await verify(user!.id)
+        if (!bioSuccess) return
+      }
+    } catch (err: any) {
+      alert(`Biometric verification failed: ${err.message}. If you haven't set it up, please do so in your Profile.`)
+      return
+    }
 
     await submitLog({
       type: isCheckedIn ? 'exit' : 'entry',
