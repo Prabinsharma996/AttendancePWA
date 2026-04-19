@@ -126,6 +126,29 @@ export const getAllStaff = async (orgId: string): Promise<User[]> => {
   return data ?? []
 }
 
+export const updateStaff = async (userId: string, updates: Partial<User>) => {
+  const { data, error } = await supabase
+    .from('users')
+    .update(updates)
+    .eq('id', userId)
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export const deleteStaff = async (userId: string) => {
+  // We opt for a soft delete/deactivation to preserve attendance logs
+  const { data, error } = await supabase
+    .from('users')
+    .update({ is_active: false })
+    .eq('id', userId)
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
 // ─── Locations APIs ────────────────────────────────────────────────────────
 export const getLocations = async (orgId: string) => {
   const { data, error } = await supabase.from('locations').select('*').eq('org_id', orgId);

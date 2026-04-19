@@ -268,14 +268,16 @@ BEGIN
   END IF;
 
   -- Insert user profile
-  INSERT INTO public.users (id, email, full_name, role, phone, org_id)
+  INSERT INTO public.users (id, email, full_name, role, phone, org_id, department, designation)
   VALUES (
     new.id,
     new.email,
     COALESCE(new.raw_user_meta_data->>'full_name', 'Unknown User'),
     user_role,
     new.raw_user_meta_data->>'phone',
-    new_org_id
+    new_org_id,
+    new.raw_user_meta_data->>'department',
+    new.raw_user_meta_data->>'designation'
   );
   
   RETURN new;

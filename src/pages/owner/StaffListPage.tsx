@@ -1,11 +1,12 @@
 import { useState, useRef } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Users, Search, Download, Upload, Plus, MoreVertical, Edit2, UserX, X, AlertCircle, Loader2 } from 'lucide-react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { Users, Search, Download, Upload, Plus, Edit2, UserX, X, AlertCircle } from 'lucide-react'
 import Papa from 'papaparse'
 import { useAuthStore } from '../../store/authStore'
-import { getAllStaff } from '../../api/attendance'
+import { getAllStaff, updateStaff, deleteStaff } from '../../api/attendance'
 import { adminAuthClient } from '../../api/adminAuthClient'
 import { Button } from '../../components/Button'
+import type { User } from '../../types'
 
 export default function StaffListPage() {
   const { user } = useAuthStore()
@@ -26,14 +27,17 @@ export default function StaffListPage() {
   const [inviting, setInviting] = useState(false)
   const [inviteError, setInviteError] = useState<string | null>(null)
 
+  const [editingStaff, setEditingStaff] = useState<User | null>(null)
+  const [updating, setUpdating] = useState(false)
+
   const handleCSVUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
     Papa.parse(file, {
       header: true,
+      skipEmptyLines: true,
       complete: (results) => {
-        console.log('Parsed CSV', results.data)
-        alert(`Parsed ${results.data.length} rows. Backend integration required to securely send invites.`)
+        alert(`Parsed ${results.data.length} rows. Mass import via admin client is recommended for production.`)
       }
     })
   }
@@ -45,7 +49,7 @@ export default function StaffListPage() {
     setInviting(true)
 
     try {
-      const { data, error } = await adminAuthClient.auth.signUp({
+      const { error } = await adminAuthClient.auth.signUp({
         email: inviteForm.email,
         password: inviteForm.password,
         options: {
@@ -63,11 +67,43 @@ export default function StaffListPage() {
       setInviteForm({ full_name: '', email: '', password: '', department: '' })
       setIsInviteModalOpen(false)
       qc.invalidateQueries({ queryKey: ['staff', user.org_id] })
-      alert("Staff added successfully!")
+      alert("Staff invited successfully! They will appear in the list once they confirm their email (or immediately if auto-confirm is enabled).")
     } catch (err: any) {
       setInviteError(err.message)
     } finally {
       setInviting(false)
+    }
+  }
+
+  const handleUpdateStaff = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingStaff) return
+    setUpdating(true)
+    try {
+      await updateStaff(editingStaff.id, {
+        full_name: editingStaff.full_name,
+        department: editingStaff.department,
+        designation: editingStaff.designation,
+        is_active: editingStaff.is_active
+      })
+      qc.invalidateQueries({ queryKey: ['staff', user?.org_id] })
+      setEditingStaff(null)
+    } catch (err: any) {
+      alert(err.message)
+    } finally {
+      setUpdating(false)
+    }
+  }
+
+  const handleToggleStatus = async (staffMember: User) => {
+    const action = staffMember.is_active ? 'deactivate' : 'activate'
+    if (!confirm(`Are you sure you want to ${action} ${staffMember.full_name}?`)) return
+    
+    try {
+      await updateStaff(staffMember.id, { is_active: !staffMember.is_active })
+      qc.invalidateQueries({ queryKey: ['staff', user?.org_id] })
+    } catch (err: any) {
+      alert(err.message)
     }
   }
 
@@ -98,7 +134,6 @@ export default function StaffListPage() {
         </div>
       </div>
 
-      {/* Filters */}
       <div className="glass rounded-xl p-4 flex flex-col md:flex-row gap-4 border border-slate-700/50">
         <div className="flex-1 relative">
           <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -117,7 +152,6 @@ export default function StaffListPage() {
         </select>
       </div>
 
-      {/* Table */}
       <div className="glass rounded-xl overflow-hidden border border-slate-700/50">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
@@ -159,8 +193,18 @@ export default function StaffListPage() {
                     </td>
                     <td className="p-4 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <button className="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors"><Edit2 className="w-4 h-4" /></button>
-                        <button className="p-2 text-slate-400 hover:text-red-400 rounded-lg hover:bg-red-500/10 transition-colors"><UserX className="w-4 h-4" /></button>
+                        <button 
+                          onClick={() => setEditingStaff(s)}
+                          className="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button 
+                          onClick={() => handleToggleStatus(s)}
+                          className="p-2 text-slate-400 hover:text-red-400 rounded-lg hover:bg-red-500/10 transition-colors"
+                        >
+                          <UserX className="w-4 h-4" />
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -204,6 +248,46 @@ export default function StaffListPage() {
 
               <div className="pt-2">
                 <Button type="submit" className="w-full" loading={inviting}>Create Staff Account</Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {editingStaff && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+          <div className="w-full max-w-md bg-slate-900 border border-slate-700 rounded-2xl p-6 shadow-2xl relative">
+            <button onClick={() => setEditingStaff(null)} className="absolute top-4 right-4 text-slate-400 hover:text-white">
+              <X className="w-5 h-5" />
+            </button>
+            <h2 className="text-xl font-bold text-white mb-4">Edit Staff Profile</h2>
+            <form onSubmit={handleUpdateStaff} className="flex flex-col gap-4">
+              <div>
+                <label className="text-xs font-medium text-slate-400 mb-1 block">Full Name</label>
+                <input required type="text" value={editingStaff.full_name} onChange={e => setEditingStaff({...editingStaff, full_name: e.target.value})} className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white" />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-400 mb-1 block">Department</label>
+                <input type="text" value={editingStaff.department || ''} onChange={e => setEditingStaff({...editingStaff, department: e.target.value})} className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white" />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-400 mb-1 block">Designation</label>
+                <input type="text" value={editingStaff.designation || ''} onChange={e => setEditingStaff({...editingStaff, designation: e.target.value})} className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white" />
+              </div>
+              
+              <div className="flex items-center gap-3 pt-2">
+                <input 
+                  type="checkbox" 
+                  id="user-active"
+                  checked={editingStaff.is_active} 
+                  onChange={e => setEditingStaff({...editingStaff, is_active: e.target.checked})}
+                  className="w-4 h-4 rounded border-slate-700 bg-slate-800 text-sky-500 focus:ring-sky-500/50" 
+                />
+                <label htmlFor="user-active" className="text-sm font-medium text-slate-300">Staff account is active</label>
+              </div>
+
+              <div className="pt-2">
+                <Button type="submit" className="w-full" loading={updating}>Update Profile</Button>
               </div>
             </form>
           </div>
